@@ -1,0 +1,962 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score Santé Personnalisé</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@600;700&display=swap" rel="stylesheet"> <!-- Fallback for Recoleta -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        .font-recoleta {
+            font-family: 'Roboto Slab', serif;
+            font-weight: 700;
+        }
+        .font-jakarta {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .bg-custom-green {
+            background-color: #0F352D;
+        }
+        .bg-custom-cream {
+            background-color: #FEFFED;
+        }
+        .list-options label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-custom-cream font-jakarta">
+    <div id="app" class="max-w-2xl mx-auto p-4">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="bg-white rounded-lg shadow-lg p-6 text-center">
+            <h1 class="text-2xl font-bold mb-4 font-recoleta">Prenez 2 min pour faire un bilan santé personnalisé</h1>
+            <button onclick="showScreen('basic-info')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90">Commencer</button>
+        </div>
+
+        <!-- Basic Info Screen -->
+        <div id="basic-info" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Informations de base</h2>
+            <form id="basic-info-form">
+                <div class="mb-4">
+                    <label class="block text-gray-700">Âge</label>
+                    <input type="number" id="age" class="w-full p-2 border rounded" required min="1">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700">Sexe</label>
+                    <select id="sex" class="w-full p-2 border rounded" required>
+                        <option value="">Sélectionnez</option>
+                        <option value="Homme">Homme</option>
+                        <option value="Femme">Femme</option>
+                        <option value="Autre">Autre</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700">Poids (kg)</label>
+                    <input type="number" id="weight" class="w-full p-2 border rounded" required min="1" step="0.1">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700">Taille (cm)</label>
+                    <input type="number" id="height" class="w-full p-2 border rounded" required min="1" step="0.1">
+                </div>
+                <button type="submit" onclick="saveBasicInfo(); showScreen('questionnaire-0')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90">Suivant</button>
+            </form>
+        </div>
+
+        <!-- Questionnaire Screens -->
+        <div id="questionnaire-0" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Objectifs de bien-être</h2>
+            <p class="mb-4">Quels sont vos 3 principaux objectifs de bien-être ? (Choisissez jusqu'à 3 options)</p>
+            <form id="form-0">
+                <div class="space-y-2 list-options">
+                    <label><input type="checkbox" name="goals" value="sommeil"> Améliorer mon sommeil</label>
+                    <label><input type="checkbox" name="goals" value="energie"> Avoir plus d'énergie au quotidien</label>
+                    <label><input type="checkbox" name="goals" value="stress"> Réduire mon stress ou mon anxiété</label>
+                    <label><input type="checkbox" name="goals" value="concentration"> Mieux me concentrer et être plus productif(ve)</label>
+                    <label><input type="checkbox" name="goals" value="alimentation"> Améliorer mon alimentation et ma digestion</label>
+                    <label><input type="checkbox" name="goals" value="immunite"> Renforcer mon immunité</label>
+                    <label><input type="checkbox" name="goals" value="poids"> Mieux gérer mon poids</label>
+                    <label><input type="checkbox" name="goals" value="moral"> Me sentir bien moralement / émotionnellement</label>
+                    <label><input type="checkbox" name="goals" value="mobilite"> Être plus mobile et souple dans mon corps</label>
+                    <label><input type="checkbox" name="goals" value="mouvement"> Bouger plus facilement sans douleurs ou raideurs</label>
+                </div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 1/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(0); showScreen('questionnaire-1')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Continuer</button>
+            </form>
+        </div>
+
+        <div id="questionnaire-1" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Activité physique & sédentarité</h2>
+            <form id="form-1">
+                <p class="mb-4">Quel est votre niveau d'activité physique au quotidien ?</p>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="activity" value="sedentaire" data-score="1"> Je suis majoritairement sédentaire</label>
+                    <label><input type="radio" name="activity" value="marche" data-score="3"> Je marche un peu chaque jour sans sport structuré</label>
+                    <label><input type="radio" name="activity" value="moderee" data-score="5"> Activité modérée 2 à 3 fois/semaine</label>
+                    <label><input type="radio" name="activity" value="reguliere" data-score="7"> Actif(ve) régulier(e) > 4 fois/semaine</label>
+                    <label><input type="radio" name="activity" value="sportif" data-score="8"> Sportif(ve) engagé(e) ou compétiteur(trice)</label>
+                </div>
+                <div id="subquestions-1" class="mt-4 hidden"></div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 20%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 2/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(1); showScreen('questionnaire-2')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Continuer</button>
+            </form>
+        </div>
+
+        <div id="questionnaire-2" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Nutrition</h2>
+            <form id="form-2">
+                <p class="mb-4">Laquelle de ces affirmations décrit le plus fidèlement vos habitudes alimentaires actuelles ?</p>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="nutrition" value="rapides" data-score="1"> Je consomme souvent des repas rapides ou industriels</label>
+                    <label><input type="radio" name="nutrition" value="varies" data-score="4"> Mes repas sont variés mais je ne fais pas toujours attention à l'équilibre nutritionnel</label>
+                    <label><input type="radio" name="nutrition" value="equilibre" data-score="7"> Je veille à manger équilibré avec une bonne diversité d'aliments</label>
+                    <label><input type="radio" name="nutrition" value="regime" data-score="5"> Je suis un régime alimentaire spécifique</label>
+                    <label><input type="radio" name="nutrition" value="controle" data-score="3"> Je contrôle strictement ce que je mange</label>
+                </div>
+                <div id="subquestions-2" class="mt-4 hidden"></div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 40%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 3/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(2); showScreen('questionnaire-3')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Continuer</button>
+            </form>
+        </div>
+
+        <div id="questionnaire-3" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Sommeil & récupération</h2>
+            <form id="form-3">
+                <p class="mb-4">Laquelle de ces affirmations décrit le mieux votre sommeil ces dernières semaines ?</p>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="sleep" value="difficile" data-score="2"> J'ai souvent du mal à m'endormir ou je me réveille plusieurs fois par nuit</label>
+                    <label><input type="radio" name="sleep" value="non_reparateur" data-score="5"> Je dors suffisamment d'heures, mais mon sommeil n'est pas toujours réparateur</label>
+                    <label><input type="radio" name="sleep" value="variable" data-score="7"> Je dors entre 6 et 8 h par nuit, avec quelques variations selon les jours</label>
+                    <label><input type="radio" name="sleep" value="bon" data-score="8"> Je dors bien et me réveille reposé(e) la plupart du temps</label>
+                    <label><input type="radio" name="sleep" value="peu" data-score="3"> Je dors peu, par choix ou contraintes, mais je compense par d'autres formes de récupération</label>
+                </div>
+                <div id="subquestions-3" class="mt-4 hidden"></div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 60%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 4/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(3); showScreen('questionnaire-4')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Continuer</button>
+            </form>
+        </div>
+
+        <div id="questionnaire-4" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Santé mentale & stress</h2>
+            <form id="form-4">
+                <p class="mb-4">Comment décririez-vous votre état émotionnel et votre niveau de stress ces dernières semaines ?</p>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="mental" value="stresse" data-score="1"> Je me sens souvent stressé(e), anxieux(se), voire dépassé(e)</label>
+                    <label><input type="radio" name="mental" value="hauts_bas" data-score="3"> J'ai des hauts et des bas émotionnels fréquents, selon les périodes</label>
+                    <label><input type="radio" name="mental" value="stable" data-score="6"> Je me sens globalement stable, même si je ressens parfois de la pression</label>
+                    <label><input type="radio" name="mental" value="serein" data-score="8"> Je me sens serein(e), confiant(e) et bien dans ma tête la plupart du temps</label>
+                    <label><input type="radio" name="mental" value="controle_emotions" data-score="4"> Je contrôle beaucoup mes émotions, mais j'ai du mal à les exprimer ou à demander de l'aide</label>
+                </div>
+                <div id="subquestions-4" class="mt-4 hidden"></div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 80%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 5/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(4); showScreen('questionnaire-5')" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Continuer</button>
+            </form>
+        </div>
+
+        <div id="questionnaire-5" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Antécédents & suivi médical</h2>
+            <form id="form-5">
+                <p class="mb-4">Quelle phrase décrit le mieux votre situation médicale actuelle ?</p>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="medical" value="chronique" data-score="2"> J'ai plusieurs antécédents médicaux ou traitements en cours</label>
+                    <label><input type="radio" name="medical" value="passe" data-score="2"> J'ai eu des problèmes de santé par le passé, mais je ne suis plus suivi(e) régulièrement</label>
+                    <label><input type="radio" name="medical" value="bilans" data-score="7"> Je fais des bilans ou check-ups ponctuellement, sans problème de santé connu</label>
+                    <label><input type="radio" name="medical" value="bonne_sante" data-score="8"> Je suis en bonne santé à ma connaissance, sans antécédent médical significatif</label>
+                    <label><input type="radio" name="medical" value="inconnu" data-score="2"> Je ne sais pas vraiment où j'en suis médicalement, je consulte rarement</label>
+                </div>
+                <div id="subquestions-5" class="mt-4 hidden"></div>
+                <div class="mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div class="bg-custom-green h-2.5 rounded-full" style="width: 100%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600">Étape 6/6</p>
+                </div>
+                <button type="button" onclick="saveAnswers(5); showResults()" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Voir les résultats</button>
+            </form>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="results" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 font-recoleta">Votre Score Santé</h2>
+            <div id="global-score" class="text-center mb-6">
+                <p class="text-2xl font-bold font-recoleta">Score global : <span id="global-score-value"></span>/100</p>
+                <p id="global-interpretation" class="text-gray-600"></p>
+            </div>
+            <div id="category-scores" class="space-y-4"></div>
+            <div id="recommendations" class="mt-6">
+                <h3 class="text-lg font-semibold font-recoleta">Recommandations personnalisées</h3>
+                <ul id="recommendations-list" class="list-disc pl-5"></ul>
+            </div>
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold font-recoleta">Souhaitez-vous faire un check-up avec un professionnel ?</h3>
+                <div class="space-y-2 list-options">
+                    <label><input type="radio" name="teleconsultation" value="yes"> Oui, je veux prendre rendez-vous maintenant</label>
+                    <label><input type="radio" name="teleconsultation" value="no"> Non, pas pour le moment</label>
+                    <label><input type="radio" name="teleconsultation" value="info"> Je veux en savoir plus sur les téléconsultations Tessan</label>
+                </div>
+                <div id="transmit-data" class="mt-4 hidden">
+                    <label class="block"><input type="checkbox" id="transmit-data-checkbox"> Je souhaite transmettre mes données pour gagner du temps</label>
+                    <div id="email-field" class="mt-2 hidden">
+                        <label class="block text-gray-700">Adresse e-mail</label>
+                        <input type="email" id="email" class="w-full p-2 border rounded">
+                    </div>
+                </div>
+                <button onclick="handleTeleconsultation()" class="bg-custom-green text-white px-6 py-2 rounded hover:bg-opacity-90 mt-4">Suivant</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userData = {
+            basic: {},
+            goals: [],
+            answers: {}
+        };
+
+        const subQuestions = {
+            1: {
+                sedentaire: [
+                    {
+                        question: "Combien d'heures passez-vous assis(e) ou inactif(ve) chaque jour, en moyenne ?",
+                        options: [
+                            { text: "Moins de 4 h", score: 1 },
+                            { text: "Entre 4 h et 8 h", score: 3 },
+                            { text: "Plus de 8 h", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Quelles sont les principales raisons qui vous empêchent d'être plus actif(ve) ?",
+                        options: [
+                            { text: "Manque de temps", score: 4 },
+                            { text: "Douleurs / limitations physiques", score: 3 },
+                            { text: "Motivation faible", score: 3 },
+                            { text: "Autre", score: 3 }
+                        ]
+                    }
+                ],
+                marche: [
+                    {
+                        question: "Combien de pas estimez-vous faire par jour en moyenne ?",
+                        options: [
+                            { text: "Moins de 3000", score: 1 },
+                            { text: "Entre 3000 et 7000", score: 3 },
+                            { text: "Plus de 7000", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Souhaiteriez-vous intégrer une activité physique plus structurée à votre routine ?",
+                        options: [
+                            { text: "Oui", score: 6 },
+                            { text: "Non", score: 2 },
+                            { text: "Je ne sais pas", score: 3 }
+                        ]
+                    }
+                ],
+                moderee: [
+                    {
+                        question: "Quel type d'activité pratiquez-vous le plus souvent ?",
+                        options: [
+                            { text: "Marche rapide / jogging", score: 4 },
+                            { text: "Natation / vélo", score: 6 },
+                            { text: "Fitness / musculation", score: 5 },
+                            { text: "Yoga / Pilates", score: 4 },
+                            { text: "Autre", score: 4 }
+                        ]
+                    },
+                    {
+                        question: "Depuis combien de temps tenez-vous ce rythme ?",
+                        options: [
+                            { text: "Moins de 3 mois", score: 2 },
+                            { text: "3 à 12 mois", score: 4 },
+                            { text: "Plus d'un an", score: 6 }
+                        ]
+                    }
+                ],
+                reguliere: [
+                    {
+                        question: "Alternez-vous les types d'activités (cardio, renforcement, récupération, etc.) ?",
+                        options: [
+                            { text: "Oui, je varie régulièrement", score: 5 },
+                            { text: "Non, je fais toujours la même chose", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Avez-vous parfois des douleurs ou de la fatigue excessive après vos séances ?",
+                        options: [
+                            { text: "Oui, souvent", score: 1 },
+                            { text: "Parfois", score: 3 },
+                            { text: "Non, jamais", score: 6 }
+                        ]
+                    }
+                ],
+                sportif: [
+                    {
+                        question: "Avez-vous un objectif spécifique actuellement ?",
+                        options: [
+                            { text: "Compétition / performance", score: 6 },
+                            { text: "Prise de masse / perte de poids", score: 5 },
+                            { text: "Maintien forme / mental", score: 4 },
+                            { text: "Autre", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Bénéficiez-vous d'un accompagnement (coach, kiné, nutritionniste...) ?",
+                        options: [
+                            { text: "Oui", score: 6 },
+                            { text: "Non", score: 2 },
+                            { text: "Ponctuellement", score: 4 }
+                        ]
+                    }
+                ]
+            },
+            2: {
+                rapides: [
+                    {
+                        question: "Qu'est-ce qui vous pousse le plus souvent à opter pour ce type de repas ?",
+                        options: [
+                            { text: "Manque de temps", score: 1 },
+                            { text: "Praticité / organisation", score: 2 },
+                            { text: "Goût / habitude", score: 1 },
+                            { text: "Autre", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Ressentez-vous souvent des ballonnements ou une gêne digestive après vos repas ?",
+                        options: [
+                            { text: "Oui, fréquemment", score: 1 },
+                            { text: "Parfois", score: 2 },
+                            { text: "Rarement", score: 3 },
+                            { text: "Non", score: 4 }
+                        ]
+                    }
+                ],
+                varies: [
+                    {
+                        question: "Quels types d'aliments sont les plus présents dans vos repas actuellement ?",
+                        options: [
+                            { text: "Féculents", score: 3 },
+                            { text: "Protéines animales", score: 4 },
+                            { text: "Produits transformés", score: 1 },
+                            { text: "Fruits et légumes", score: 6 },
+                            { text: "Autre", score: 3 }
+                        ]
+                    },
+                    {
+                        question: "Ressentez-vous souvent des ballonnements ou une gêne digestive après vos repas ?",
+                        options: [
+                            { text: "Oui, fréquemment", score: 1 },
+                            { text: "Parfois", score: 3 },
+                            { text: "Rarement", score: 4 },
+                            { text: "Non", score: 6 }
+                        ]
+                    }
+                ],
+                equilibre: [
+                    {
+                        question: "Quels sont les principes ou habitudes qui vous aident à garder cet équilibre ?",
+                        options: [
+                            { text: "Planification des repas", score: 5 },
+                            { text: "Lecture des étiquettes", score: 4 },
+                            { text: "Préparation maison", score: 5 },
+                            { text: "Suivi via une app ou journal", score: 4 }
+                        ]
+                    },
+                    {
+                        question: "Y a-t-il un ou plusieurs groupes d'aliments que vous consommez peu ou jamais ?",
+                        options: [
+                            { text: "Légumineuses", score: 2 },
+                            { text: "Poissons / fruits de mer", score: 5 },
+                            { text: "Produits laitiers ou substituts", score: 4 },
+                            { text: "Fruits et légumes", score: 1 },
+                            { text: "Aucun, je consomme un peu de tout", score: 6 }
+                        ]
+                    }
+                ],
+                regime: [
+                    {
+                        question: "Depuis combien de temps suivez-vous ce régime, et pour quelle(s) raison(s) ?",
+                        options: [
+                            { text: "Santé", score: 6 },
+                            { text: "Éthique / convictions personnelles", score: 3 },
+                            { text: "Intolérances ou allergies", score: 6 },
+                            { text: "Autre", score: 4 }
+                        ]
+                    },
+                    {
+                        question: "Certains groupes d'aliments ou nutriments sont-ils peu ou pas présents dans votre alimentation actuelle ?",
+                        options: [
+                            { text: "Produits d'origine animale", score: 3 },
+                            { text: "Produits laitiers", score: 4 },
+                            { text: "Fruits et légumes", score: 1 },
+                            { text: "Aucun, je veille à couvrir tous les groupes", score: 6 }
+                        ]
+                    }
+                ],
+                controle: [
+                    {
+                        question: "Qu'est-ce qui vous a motivé à adopter ce niveau de contrôle alimentaire ?",
+                        options: [
+                            { text: "Objectif de santé ou performance", score: 5 },
+                            { text: "Perte ou prise de poids", score: 4 },
+                            { text: "Accompagnement professionnel", score: 3 },
+                            { text: "Autre", score: 3 }
+                        ]
+                    },
+                    {
+                        question: "Y a-t-il des catégories d'aliments ou nutriments que vous limitez fortement ou évitez ?",
+                        options: [
+                            { text: "Matières grasses", score: 3 },
+                            { text: "Féculents ou glucides", score: 2 },
+                            { text: "Produits sucrés", score: 5 },
+                            { text: "Aucun, je veille à l'équilibre global", score: 5 }
+                        ]
+                    }
+                ]
+            },
+            3: {
+                difficile: [
+                    {
+                        question: "Qu'est-ce qui, selon vous, perturbe le plus votre sommeil ?",
+                        options: [
+                            { text: "Le stress ou l'anxiété", score: 1 },
+                            { text: "L'environnement (bruit, lumière, température)", score: 2 },
+                            { text: "Les habitudes de vie (écrans, caféine, horaires irréguliers)", score: 2 },
+                            { text: "Autre", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Avez-vous déjà essayé des techniques pour améliorer votre endormissement ou réduire vos réveils nocturnes ?",
+                        options: [
+                            { text: "Oui, j'ai essayé des techniques de relaxation ou de méditation", score: 4 },
+                            { text: "Oui, j'ai changé certaines habitudes", score: 4 },
+                            { text: "Non, je n'ai pas encore essayé", score: 1 }
+                        ]
+                    }
+                ],
+                non_reparateur: [
+                    {
+                        question: "Quels facteurs rendent votre sommeil moins reposant ?",
+                        options: [
+                            { text: "Le bruit", score: 5 },
+                            { text: "La lumière", score: 5 },
+                            { text: "Les repas tardifs", score: 2 },
+                            { text: "Le stress ou les soucis", score: 1 }
+                        ]
+                    },
+                    {
+                        question: "Que faites-vous habituellement pour essayer de mieux récupérer ?",
+                        options: [
+                            { text: "Je fais des siestes", score: 5 },
+                            { text: "Je pratique la relaxation ou le yoga", score: 5 },
+                            { text: "Je ne fais rien de particulier", score: 1 }
+                        ]
+                    }
+                ],
+                variable: [
+                    {
+                        question: "Quelles sont les principales causes de ces variations ?",
+                        options: [
+                            { text: "Le travail ou les études", score: 3 },
+                            { text: "Les obligations familiales", score: 4 },
+                            { text: "Les loisirs ou activités sociales", score: 5 },
+                            { text: "Le stress", score: 1 }
+                        ]
+                    },
+                    {
+                        question: "Comment vous sentez-vous après une nuit où vous avez dormi moins longtemps ?",
+                        options: [
+                            { text: "Fatigué(e)", score: 1 },
+                            { text: "Irritable", score: 1 },
+                            { text: "Moins concentré(e)", score: 2 },
+                            { text: "Ça ne change rien", score: 5 }
+                        ]
+                    }
+                ],
+                bon: [
+                    {
+                        question: "Quelles habitudes favorisent la qualité de votre sommeil ?",
+                        options: [
+                            { text: "Routine régulière", score: 6 },
+                            { text: "Activité physique", score: 6 },
+                            { text: "Limitation des écrans le soir", score: 4 },
+                            { text: "Environnement calme et confortable", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Avez-vous déjà utilisé des solutions ou compléments pour favoriser l'endormissement ?",
+                        options: [
+                            { text: "Oui, de la mélatonine", score: 5 },
+                            { text: "Non, je n'ai jamais utilisé de complément", score: 6 }
+                        ]
+                    }
+                ],
+                peu: [
+                    {
+                        question: "Quelles méthodes de récupération utilisez-vous le plus souvent ?",
+                        options: [
+                            { text: "Siestes", score: 4 },
+                            { text: "Techniques de relaxation ou méditation", score: 5 },
+                            { text: "Repos sans dormir", score: 1 }
+                        ]
+                    },
+                    {
+                        question: "Avez-vous remarqué une différence lorsque vous ne pouvez pas utiliser ces méthodes ?",
+                        options: [
+                            { text: "Oui, je me sens moins bien", score: 4 },
+                            { text: "Non, je ne ressens pas de différence", score: 3 }
+                        ]
+                    }
+                ]
+            },
+            4: {
+                stresse: [
+                    {
+                        question: "Quelles situations ou facteurs contribuent le plus à votre stress ?",
+                        options: [
+                            { text: "Le travail ou les études", score: 2 },
+                            { text: "Les relations familiales ou amicales", score: 3 },
+                            { text: "Les soucis financiers", score: 2 },
+                            { text: "Autre", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Quelles stratégies utilisez-vous pour gérer votre stress ou votre anxiété ?",
+                        options: [
+                            { text: "Je parle à des proches ou à un professionnel", score: 4 },
+                            { text: "Je pratique des techniques de relaxation ou de méditation", score: 5 },
+                            { text: "Je n'arrive pas à trouver de solution", score: 0 }
+                        ]
+                    }
+                ],
+                hauts_bas: [
+                    {
+                        question: "Quels sont les principaux déclencheurs de vos variations émotionnelles ?",
+                        options: [
+                            { text: "Les événements de la vie quotidienne", score: 5 },
+                            { text: "Les relations avec les autres", score: 4 },
+                            { text: "Le stress au travail ou à l'école", score: 3 }
+                        ]
+                    },
+                    {
+                        question: "Comment gérez-vous ces variations d'humeur ?",
+                        options: [
+                            { text: "Je pratique des activités apaisantes", score: 6 },
+                            { text: "Je m'isole pour me ressourcer", score: 4 },
+                            { text: "Je n'arrive pas à bien les gérer", score: 2 }
+                        ]
+                    }
+                ],
+                stable: [
+                    {
+                        question: "Quelles sont les sources de pression que vous ressentez occasionnellement ?",
+                        options: [
+                            { text: "Le travail ou les études", score: 4 },
+                            { text: "Les obligations familiales", score: 4 },
+                            { text: "Les imprévus de la vie", score: 3 }
+                        ]
+                    },
+                    {
+                        question: "Que faites-vous pour retrouver votre équilibre émotionnel ?",
+                        options: [
+                            { text: "Je pratique une activité relaxante", score: 6 },
+                            { text: "Je prends du temps pour moi", score: 5 }
+                        ]
+                    }
+                ],
+                serein: [
+                    {
+                        question: "Quelles habitudes ou pratiques contribuent à votre bien-être mental ?",
+                        options: [
+                            { text: "Une routine équilibrée", score: 6 },
+                            { text: "La méditation ou la pleine conscience", score: 6 },
+                            { text: "Des relations positives avec les autres", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Lorsque des situations imprévues ou stressantes se présentent, comment réagissez-vous ?",
+                        options: [
+                            { text: "Je garde mon calme et je m'adapte rapidement", score: 6 },
+                            { text: "J'ai besoin de temps, mais je finis par gérer", score: 5 }
+                        ]
+                    }
+                ],
+                controle_emotions: [
+                    {
+                        question: "Quelles sont les situations où vous ressentez le plus de difficultés à exprimer vos émotions ?",
+                        options: [
+                            { text: "Face à des conflits", score: 3 },
+                            { text: "Lorsque je dois demander de l'aide", score: 3 },
+                            { text: "Dans les moments de stress intense", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Quelles stratégies utilisez-vous pour gérer ce blocage émotionnel ?",
+                        options: [
+                            { text: "J'écris mes émotions dans un journal", score: 6 },
+                            { text: "Je parle à une personne de confiance", score: 6 },
+                            { text: "Je n'arrive pas à trouver de solution", score: 2 }
+                        ]
+                    }
+                ]
+            },
+            5: {
+                chronique: [
+                    {
+                        question: "Quels types de soins ou de suivis médicaux faites-vous actuellement ?",
+                        options: [
+                            { text: "Suivi médical régulier", score: 4 },
+                            { text: "Prise de traitements ou médicaments", score: 3 },
+                            { text: "Maladie chronique", score: 1 }
+                        ]
+                    },
+                    {
+                        question: "Fumez-vous actuellement du tabac ?",
+                        options: [
+                            { text: "Oui, tous les jours", score: 1 },
+                            { text: "Oui, occasionnellement", score: 2 },
+                            { text: "Non, j'ai arrêté", score: 3 },
+                            { text: "Je n'ai jamais fumé", score: 4 }
+                        ]
+                    }
+                ],
+                passe: [
+                    {
+                        question: "Quels types de problèmes de santé avez-vous rencontrés ?",
+                        options: [
+                            { text: "Problèmes physiques", score: 3 },
+                            { text: "Maladie chronique", score: 2 },
+                            { text: "Troubles psychologiques ou émotionnels", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Fumez-vous actuellement du tabac ?",
+                        options: [
+                            { text: "Oui, tous les jours", score: 1 },
+                            { text: "Oui, occasionnellement", score: 2 },
+                            { text: "Non, j'ai arrêté", score: 3 },
+                            { text: "Je n'ai jamais fumé", score: 4 }
+                        ]
+                    }
+                ],
+                bilans: [
+                    {
+                        question: "À quelle fréquence faites-vous des bilans de santé ?",
+                        options: [
+                            { text: "Une fois par an", score: 6 },
+                            { text: "Tous les 2 à 3 ans", score: 5 },
+                            { text: "À la demande ou en cas de symptôme", score: 4 }
+                        ]
+                    },
+                    {
+                        question: "Quelles sont vos motivations pour faire des bilans de santé ?",
+                        options: [
+                            { text: "Prévention", score: 6 },
+                            { text: "Rassurance", score: 5 },
+                            { text: "Obligation professionnelle ou familiale", score: 4 }
+                        ]
+                    }
+                ],
+                bonne_sante: [
+                    {
+                        question: "Quelles sont vos habitudes pour préserver votre santé ?",
+                        options: [
+                            { text: "Alimentation équilibrée", score: 6 },
+                            { text: "Activité physique régulière", score: 6 },
+                            { text: "Bonne gestion du stress", score: 5 }
+                        ]
+                    },
+                    {
+                        question: "Prenez-vous régulièrement l'un des éléments suivants ?",
+                        options: [
+                            { text: "Médicaments sans ordonnance", score: 3 },
+                            { text: "Compléments alimentaires", score: 5 },
+                            { text: "Aucun de ces produits", score: 6 }
+                        ]
+                    }
+                ],
+                inconnu: [
+                    {
+                        question: "Quelles sont les raisons pour lesquelles vous consultez rarement un professionnel de santé ?",
+                        options: [
+                            { text: "Je n'en ressens pas le besoin", score: 4 },
+                            { text: "Je n'ai pas le temps", score: 3 },
+                            { text: "Je n'aime pas aller chez le médecin", score: 2 }
+                        ]
+                    },
+                    {
+                        question: "Comment évaluez-vous votre état de santé actuel ?",
+                        options: [
+                            { text: "Je me sens bien", score: 6 },
+                            { text: "Je ne sais pas vraiment", score: 3 },
+                            { text: "J'ai parfois des symptômes, mais je ne consulte pas", score: 2 }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        function showScreen(screenId) {
+            document.querySelectorAll('#app > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+
+            if (screenId.startsWith('questionnaire-')) {
+                const index = parseInt(screenId.split('-')[1]);
+                if (index > 0) {
+                    const form = document.getElementById(`form-${index}`);
+                    form.querySelectorAll('input[type="radio"]').forEach(input => {
+                        input.addEventListener('change', () => {
+                            const value = input.value;
+                            const subquestionsDiv = document.getElementById(`subquestions-${index}`);
+                            subquestionsDiv.innerHTML = '';
+                            subquestionsDiv.classList.remove('hidden');
+                            subQuestions[index][value].forEach((q, qIndex) => {
+                                const qDiv = document.createElement('div');
+                                qDiv.className = 'mt-4';
+                                qDiv.innerHTML = `<p class="mb-2">${q.question}</p>`;
+                                q.options.forEach((option, oIndex) => {
+                                    qDiv.innerHTML += `
+                                        <label class="block mb-2">
+                                            <input type="radio" name="subquestion-${index}-${qIndex}" value="${option.text}" data-score="${option.score}">
+                                            ${option.text}
+                                        </label>
+                                    `;
+                                });
+                                subquestionsDiv.appendChild(qDiv);
+                            });
+                        });
+                    });
+                }
+            }
+        }
+
+        function saveBasicInfo() {
+            userData.basic = {
+                age: document.getElementById('age').value,
+                sex: document.getElementById('sex').value,
+                weight: document.getElementById('weight').value,
+                height: document.getElementById('height').value
+            };
+        }
+
+        function saveAnswers(index) {
+            if (index === 0) {
+                const checkboxes = document.querySelectorAll('#form-0 input:checked');
+                userData.goals = Array.from(checkboxes).map(cb => cb.value);
+            } else {
+                const form = document.getElementById(`form-${index}`);
+                const mainAnswer = form.querySelector('input:checked');
+                const subAnswers = Array.from(form.querySelectorAll('input[name^="subquestion-"]:checked')).map(input => ({
+                    question: input.name,
+                    value: input.value,
+                    score: parseInt(input.dataset.score)
+                }));
+                userData.answers[index] = {
+                    main: mainAnswer ? { value: mainAnswer.value, score: parseInt(mainAnswer.dataset.score) } : null,
+                    sub: subAnswers
+                };
+            }
+        }
+
+        function calculateBMI() {
+            const weight = parseFloat(userData.basic.weight);
+            const height = parseFloat(userData.basic.height) / 100;
+            return (weight / (height * height)).toFixed(1);
+        }
+
+        function calculateScores() {
+            const scores = {};
+            let total = 0;
+            const maxScore = 20 * 5; // 5 categories, each max 20
+
+            for (let i = 1; i <= 5; i++) {
+                const answer = userData.answers[i];
+                if (answer && answer.main) {
+                    let categoryScore = answer.main.score * 2.5; // Main question score out of 20 (8 * 2.5 = 20)
+                    answer.sub.forEach(sub => {
+                        categoryScore += sub.score * 0.833; // Sub-question score out of 5 (6 * 0.833 ≈ 5)
+                    });
+                    scores[i] = Math.round(categoryScore);
+                    total += scores[i];
+                } else {
+                    scores[i] = 0;
+                }
+            }
+
+            return { category: scores, global: Math.round((total / maxScore) * 100) };
+        }
+
+        function getInterpretation(score) {
+            if (score <= 49) {
+                return "Risque élevé : Des facteurs de risque importants ont été détectés. Une consultation médicale rapide est fortement conseillée.";
+            } else if (score <= 74) {
+                return "Risque modéré : Vous avez de bonnes habitudes, mais quelques ajustements peuvent améliorer votre santé.";
+            } else {
+                return "Bonne santé : Bravo ! Vous semblez avoir de bonnes habitudes de vie.";
+            }
+        }
+
+        function getRecommendations() {
+            const recommendations = [];
+            const answers = userData.answers;
+
+            if (answers[1]?.main.value === 'sedentaire') {
+                recommendations.push("Intégrez 30 minutes d'activité physique quotidienne, comme la marche rapide.");
+            } else if (answers[1]?.main.value === 'marche') {
+                recommendations.push("Essayez d'ajouter une activité structurée, comme le yoga ou le vélo, 2-3 fois par semaine.");
+            }
+
+            if (answers[2]?.main.value === 'rapides') {
+                recommendations.push("Augmentez votre consommation de fruits et légumes pour réduire les repas industriels.");
+            } else if (answers[2]?.main.value === 'varies') {
+                recommendations.push("Planifiez vos repas pour inclure plus de légumes et de protéines maigres.");
+            }
+
+            if (answers[3]?.main.value === 'difficile') {
+                recommendations.push("Améliorez la qualité de votre sommeil en limitant les écrans avant le coucher.");
+            } else if (answers[3]?.main.value === 'non_reparateur') {
+                recommendations.push("Essayez des techniques de relaxation avant le coucher pour un sommeil plus réparateur.");
+            }
+
+            if (answers[4]?.main.value === 'stresse') {
+                recommendations.push("Pratiquez des techniques de relaxation, comme la méditation ou la respiration profonde.");
+            } else if (answers[4]?.main.value === 'hauts_bas') {
+                recommendations.push("Identifiez les déclencheurs de stress et discutez-en avec un proche ou un professionnel.");
+            }
+
+            if (answers[5]?.main.value === 'inconnu' || answers[5]?.main.value === 'passe') {
+                recommendations.push("Planifiez un bilan de santé avec un professionnel pour mieux connaître votre état.");
+            }
+
+            return recommendations.length > 0 ? recommendations : ["Continuez vos bonnes habitudes et envisagez un bilan régulier."];
+        }
+
+        function showResults() {
+            const bmi = calculateBMI();
+            const scores = calculateScores();
+            document.getElementById('global-score-value').textContent = scores.global;
+            document.getElementById('global-interpretation').textContent = getInterpretation(scores.global);
+
+            const categoryNames = [
+                "Activité physique & sédentarité",
+                "Nutrition",
+                "Sommeil & récupération",
+                "Santé mentale & stress",
+                "Antécédents & suivi médical"
+            ];
+
+            const categoryScoresDiv = document.getElementById('category-scores');
+            categoryScoresDiv.innerHTML = `<p class="mb-2">IMC : ${bmi}</p>`;
+            for (let i = 1; i <= 5; i++) {
+                categoryScoresDiv.innerHTML += `
+                    <div>
+                        <p class="font-semibold">${categoryNames[i-1]} : ${scores.category[i]}/20</p>
+                    </div>
+                `;
+            }
+
+            const recommendationsList = document.getElementById('recommendations-list');
+            const recommendations = getRecommendations();
+            recommendationsList.innerHTML = recommendations.map(r => `<li>${r}</li>`).join('');
+
+            showScreen('results');
+
+            document.querySelectorAll('input[name="teleconsultation"]').forEach(input => {
+                input.addEventListener('change', () => {
+                    const transmitDiv = document.getElementById('transmit-data');
+                    const emailField = document.getElementById('email-field');
+                    if (input.value === 'yes') {
+                        transmitDiv.classList.remove('hidden');
+                        emailField.classList.remove('hidden');
+                    } else {
+                        transmitDiv.classList.add('hidden');
+                        emailField.classList.add('hidden');
+                    }
+                });
+            });
+        }
+
+        function handleTeleconsultation() {
+            const selected = document.querySelector('input[name="teleconsultation"]:checked');
+            if (selected && selected.value === 'yes') {
+                if (document.getElementById('transmit-data-checkbox').checked) {
+                    const email = document.getElementById('email').value;
+                    if (email) {
+                        // Simulate data transmission (in real app, send to server)
+                        console.log('Transmitting data with email:', email, userData);
+                    }
+                }
+                window.location.href = 'https://teleconsultation.tessan.io/fr';
+            } else if (selected && selected.value === 'info') {
+                window.location.href = 'https://teleconsultation.tessan.io/fr';
+            } else {
+                alert('Merci d\'avoir complété le questionnaire !');
+            }
+        }
+    </script>
+</body>
+</html>
